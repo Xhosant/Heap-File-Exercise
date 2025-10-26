@@ -26,9 +26,9 @@ static int calc_records_per_block(void) {
 static int read_header(int fd, HeapFileHeader* h) {
   BF_Block* block = NULL;
   BF_Block_Init(&block);
-  CALL_BF_BOOL(BF_GetBlock(fd, 0, block));
+  CALL_BF(BF_GetBlock(fd, 0, block));
   memcpy(h, BF_Block_GetData(block), sizeof(*h));
-  CALL_BF_BOOL(BF_UnpinBlock(block));
+  CALL_BF(BF_UnpinBlock(block));
   BF_Block_Destroy(&block);
   return (h->magic[0] != '\0');
 }
@@ -37,17 +37,17 @@ static int read_header(int fd, HeapFileHeader* h) {
 static int write_header(int fd, const HeapFileHeader* h) {
   BF_Block* block = NULL;
   BF_Block_Init(&block);
-  CALL_BF_BOOL(BF_GetBlock(fd, 0, block));
+  CALL_BF(BF_GetBlock(fd, 0, block));
   memcpy(BF_Block_GetData(block), h, sizeof(*h));
   BF_Block_SetDirty(block);
-  CALL_BF_BOOL(BF_UnpinBlock(block));
+  CALL_BF(BF_UnpinBlock(block));
   BF_Block_Destroy(&block);
   return 1;
 }
 
 //Επιστρέφει το πλήθος blocks 
 static int get_block_count(int fd, int* out) {
-  CALL_BF_BOOL(BF_GetBlockCounter(fd, out));
+  CALL_BF(BF_GetBlockCounter(fd, out));
   return 1;
 }
 
@@ -55,11 +55,11 @@ static int get_block_count(int fd, int* out) {
 static int init_data_block(int fd) {
   BF_Block* block = NULL;
   BF_Block_Init(&block);
-  CALL_BF_BOOL(BF_AllocateBlock(fd, block));
+  CALL_BF(BF_AllocateBlock(fd, block));
   int zero = 0;
   memcpy(BF_Block_GetData(block), &zero, sizeof(int));
   BF_Block_SetDirty(block);
-  CALL_BF_BOOL(BF_UnpinBlock(block));
+  CALL_BF(BF_UnpinBlock(block));
   BF_Block_Destroy(&block);
   return 1;
 }
@@ -68,13 +68,13 @@ static int init_data_block(int fd) {
 // Δημιουργία αρχείου Heap
 
 int HeapFile_Create(const char* fileName) {
-  CALL_BF_BOOL(BF_CreateFile(fileName));
+  CALL_BF_(BF_CreateFile(fileName));
   int fd = -1;
-  CALL_BF_BOOL(BF_OpenFile(fileName, &fd));
+  CALL_BF(BF_OpenFile(fileName, &fd));
 
   BF_Block* block = NULL;
   BF_Block_Init(&block);
-  CALL_BF_BOOL(BF_AllocateBlock(fd, block));
+  CALL_BF(BF_AllocateBlock(fd, block));
 
   HeapFileHeader h;
   memset(&h, 0, sizeof(h));
@@ -86,9 +86,9 @@ int HeapFile_Create(const char* fileName) {
   memcpy(BF_Block_GetData(block), &h, sizeof(h));
   BF_Block_SetDirty(block);
 
-  CALL_BF_BOOL(BF_UnpinBlock(block));
+  CALL_BF(BF_UnpinBlock(block));
   BF_Block_Destroy(&block);
-  CALL_BF_BOOL(BF_CloseFile(fd));
+  CALL_BF(BF_CloseFile(fd));
   return 1;
 }
 
@@ -96,7 +96,7 @@ int HeapFile_Create(const char* fileName) {
 // Άνοιγμα αρχείου Heap                                      
 
 int HeapFile_Open(const char *fileName, int *file_handle, HeapFileHeader** header_info) {
-  CALL_BF_BOOL(BF_OpenFile(fileName, file_handle));
+  CALL_BF(BF_OpenFile(fileName, file_handle));
 
   HeapFileHeader temp;
   if (!read_header(*file_handle, &temp)) { BF_CloseFile(*file_handle); return 0; }
@@ -113,7 +113,7 @@ int HeapFile_Open(const char *fileName, int *file_handle, HeapFileHeader** heade
 
 int HeapFile_Close(int file_handle, HeapFileHeader *hp_info) {
   if (hp_info) write_header(file_handle, hp_info);
-  CALL_BF_BOOL(BF_CloseFile(file_handle));
+  CALL_BF(BF_CloseFile(file_handle));
   return 1;
 }
 
@@ -129,7 +129,7 @@ int HeapFile_InsertRecord(int file_handle, HeapFileHeader *hp_info, const Record
   int last = blocks - 1;
   BF_Block* block = NULL;
   BF_Block_Init(&block);
-  CALL_BF_BOOL(BF_GetBlock(file_handle, last, block));
+  CALL_BF(BF_GetBlock(file_handle, last, block));
 
   char* data = BF_Block_GetData(block);
   int* pcount = (int*)data;
@@ -140,13 +140,13 @@ int HeapFile_InsertRecord(int file_handle, HeapFileHeader *hp_info, const Record
     (*pcount)++;
     BF_Block_SetDirty(block);
   } else {
-    CALL_BF_BOOL(BF_UnpinBlock(block));
+    CALL_BF(BF_UnpinBlock(block));
     BF_Block_Destroy(&block);
     if (!init_data_block(file_handle)) return 0;
     if (!get_block_count(file_handle, &blocks)) return 0;
     last = blocks - 1;
     BF_Block_Init(&block);
-    CALL_BF_BOOL(BF_GetBlock(file_handle, last, block));
+    CALL_BF(BF_GetBlock(file_handle, last, block));
     data = BF_Block_GetData(block);
     pcount = (int*)data;
     recs = (Record*)(data + sizeof(int));
@@ -155,7 +155,7 @@ int HeapFile_InsertRecord(int file_handle, HeapFileHeader *hp_info, const Record
     BF_Block_SetDirty(block);
   }
 
-  CALL_BF_BOOL(BF_UnpinBlock(block));
+  CALL_BF(BF_UnpinBlock(block));
   BF_Block_Destroy(&block);
 
   hp_info->total_records++;
