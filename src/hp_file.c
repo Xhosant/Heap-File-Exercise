@@ -68,7 +68,7 @@ static int init_data_block(int fd) {
 // Δημιουργία αρχείου Heap
 
 int HeapFile_Create(const char* fileName) {
-  CALL_BF_(BF_CreateFile(fileName));
+  CALL_BF(BF_CreateFile(fileName));
   int fd = -1;
   CALL_BF(BF_OpenFile(fileName, &fd));
 
