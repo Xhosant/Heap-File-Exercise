@@ -16,13 +16,13 @@
     }                         \
   }
 
- //Υπολογίζει πόσες εγγραφές χωρά κάθε block 
+ // Υπολογίζει πόσες εγγραφές χωρά κάθε block
 static int calc_records_per_block(void) {
   int cap = (BF_BLOCK_SIZE - sizeof(int)) / sizeof(Record);
   return (cap > 0) ? cap : 1;
 }
 
-// Διαβάζει το header από το block 0 
+// Διαβάζει το header από το block 0
 static int read_header(int fd, HeapFileHeader* h) {
   BF_Block* block = NULL;
   BF_Block_Init(&block);
@@ -45,13 +45,13 @@ static int write_header(int fd, const HeapFileHeader* h) {
   return 1;
 }
 
-//Επιστρέφει το πλήθος blocks 
+// Επιστρέφει το πλήθος blocks
 static int get_block_count(int fd, int* out) {
   CALL_BF(BF_GetBlockCounter(fd, out));
   return 1;
 }
 
-// Δημιουργεί νέο data block με count=0 
+// Δημιουργεί νέο data block με count=0
 static int init_data_block(int fd) {
   BF_Block* block = NULL;
   BF_Block_Init(&block);
@@ -64,9 +64,7 @@ static int init_data_block(int fd) {
   return 1;
 }
 
-
 // Δημιουργία αρχείου Heap
-
 int HeapFile_Create(const char* fileName) {
   CALL_BF(BF_CreateFile(fileName));
   int fd = -1;
@@ -92,14 +90,18 @@ int HeapFile_Create(const char* fileName) {
   return 1;
 }
 
-
-// Άνοιγμα αρχείου Heap                                      
-
+// Άνοιγμα αρχείου Heap
 int HeapFile_Open(const char *fileName, int *file_handle, HeapFileHeader** header_info) {
   CALL_BF(BF_OpenFile(fileName, file_handle));
 
   HeapFileHeader temp;
   if (!read_header(*file_handle, &temp)) { BF_CloseFile(*file_handle); return 0; }
+
+  // Έλεγχος magic
+  if (strncmp(temp.magic, "HPF1", 4) != 0) {
+    BF_CloseFile(*file_handle);
+    return 0;
+  }
 
   HeapFileHeader* h = malloc(sizeof(HeapFileHeader));
   if (!h) { BF_CloseFile(*file_handle); return 0; }
@@ -108,18 +110,17 @@ int HeapFile_Open(const char *fileName, int *file_handle, HeapFileHeader** heade
   return 1;
 }
 
-
-// Κλείσιμο αρχείου Heap                                      
-
+// Κλείσιμο αρχείου Heap
 int HeapFile_Close(int file_handle, HeapFileHeader *hp_info) {
-  if (hp_info) write_header(file_handle, hp_info);
+  if (hp_info) {
+        write_header(file_handle, hp_info);
+        free(hp_info);
+  }
   CALL_BF(BF_CloseFile(file_handle));
   return 1;
 }
 
-
-// Εισαγωγή εγγραφής                                          
-
+// Εισαγωγή εγγραφής
 int HeapFile_InsertRecord(int file_handle, HeapFileHeader *hp_info, const Record record) {
   int blocks = 0;
   if (!get_block_count(file_handle, &blocks)) return 0;
@@ -158,18 +159,19 @@ int HeapFile_InsertRecord(int file_handle, HeapFileHeader *hp_info, const Record
   CALL_BF(BF_UnpinBlock(block));
   BF_Block_Destroy(&block);
 
+  //Μόνο in-memory update για απόδοση
+  // Το write_header θα γίνει στο Close
   hp_info->total_records++;
-  write_header(file_handle, hp_info);
+
   return 1;
 }
 
-
-// Δημιουργία iterator                                         
+// Δημιουργία iterator
 HeapFileIterator HeapFile_CreateIterator(int file_handle, HeapFileHeader* header_info, int id) {
   HeapFileIterator it;
   memset(&it, 0, sizeof(it));
   it.file_handle = file_handle;
-  it.header = *header_info;
+  it.header = header_info; 
   it.filter_id = id;
   it.current_block = 1;
   it.current_index_in_block = -1;
@@ -177,9 +179,7 @@ HeapFileIterator HeapFile_CreateIterator(int file_handle, HeapFileHeader* header
   return it;
 }
 
-
-// Επόμενη εγγραφή                                            
-
+// Επόμενη εγγραφή
 int HeapFile_GetNextRecord(HeapFileIterator* it, Record** record) {
   static Record temp;
   *record = NULL;
